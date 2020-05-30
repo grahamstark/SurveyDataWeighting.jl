@@ -2,9 +2,9 @@
 
 This package implements the micro data weighting procedures from:
 
-* Creedy 2003 http://www.treasury.govt.nz/publications/research-policy/wp/2003/03-17/twp03-17.pdf
-* Creedy 2003  http://www.business.curtin.edu.au/files/creedy2.pdf
-* Jean-Claude Deville and Carl-Erik Sarndal http://www.jstor.org/stable/2290268
+* Creedy, John. “Survey Reweighting for Tax Microsimulation Modelling.” Treasury Working Paper Series. New Zealand Treasury, September 2003. http://ideas.repec.org/p/nzt/nztwps/03-17.html.
+* Creedy, John, and Ivan Tuckwell. “Reweighting the New Zealand Household Economic Survey for Tax Microsimulation Modelling.” Treasury Working Paper Series. New Zealand Treasury, December 2003. https://ideas.repec.org/p/nzt/nztwps/03-33.html.
+* Deville, Jean-Claude, and Carl-Erik Sarndal. “Calibration Estimators in Survey Sampling.” Journal of the American Statistical Association 87, no. 418 (1992): 376–82.
 
 It generates a set of survey weights which are closest in some sense to a set of initial weights, but which
 can be used to weight the dataset so as to hit a set of targets, for example for genders, age ranges
