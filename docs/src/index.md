@@ -46,7 +46,7 @@ Sarndal](#Bibliography) papers on these. Notes on these:
 ## Functions and Data Structures
 
 ```@autodocs
-Modules = [BudgetConstraints]
+Modules = [SurveyDataWeighting]
 [:constant, :type, :function]
 ```
 
