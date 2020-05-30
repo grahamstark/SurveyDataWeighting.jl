@@ -39,7 +39,7 @@ target_populations - J length vector;
 tolx, tolf, max_iterations : see Solve_Non_Linear_Equation_System in the parent
 ru/rl max/min acceptable values of ratio of final_weight/initial_weight (for constrained distance functions)
 
-note: chi-square is just there for checking purposes; use Do_Basic_Reweighting if that's all you need.
+note: chi-square is just there for checking purposes; use `do_chi_square_reweighting` if that's all you need.
 
 
 """
