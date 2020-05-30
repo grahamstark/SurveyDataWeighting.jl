@@ -11,6 +11,9 @@ export ITERATIONS_EXCEEDED
    * Jean-Claude Deville and Carl-Erik Sarndal http://www.jstor.org/stable/2290268
 """
 
+"""
+Possible distance types; see Creedy.
+"""
 @enum DistanceFunctionType chi_square d_and_s_type_a d_and_s_type_b constrained_chi_square d_and_s_constrained
 
 const ITERATIONS_EXCEEDED = -1
