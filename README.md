@@ -1,6 +1,6 @@
 # SurveyDataWeighting
 
-This package mplements the micro data weighting procedures from:
+This package implements the micro data weighting procedures from:
 
 * Creedy 2003 http://www.treasury.govt.nz/publications/research-policy/wp/2003/03-17/twp03-17.pdf
 * Creedy 2003  http://www.business.curtin.edu.au/files/creedy2.pdf
