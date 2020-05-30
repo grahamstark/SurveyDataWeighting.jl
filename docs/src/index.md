@@ -2,28 +2,16 @@
 CurrentModule = SurveyDataWeighting
 ```
 
-# SurveyDataWeighting
+# SurveyDataWeighting: Generating Sample Weights for a dataset
+
 
 ```@index
 ```
 
-```@autodocs
-Modules = [SurveyDataWeighting]
-```
-
-# Generating Weights for a dataset
-
-
-This generates weights for a sample dataset such that weighted sums of dataset
-columns match some set of targets. For example, you might want to weight a
-dataset so that it matches known amounts of benefit receipts or numbers of
+This generates weights for a sample dataset such that weighted sums of dataset columns match some set of targets. For example, you might want to weight a dataset so that it matches known amounts of benefit receipts or numbers of
 households in different regions of a country, or both.
 
-A commercial product [Calmar](http://vesselinov.com/CalmarEngDoc.pdf) is
-available for this, and widely used, but there are many advantages in having a
-version that you can easily embed in a simulation program. It can be very useful
-for producing forecasts, for example; see the papers by Reed and Stark and
-Creedy in [the bibliography](biblio.md).
+A commercial product [Calmar](http://vesselinov.com/CalmarEngDoc.pdf) is available for this, and widely used, but there are many advantages in having a version that you can easily embed in a simulation program. It can be very useful for producing forecasts, for example; see the papers by Reed and Stark and Creedy below.
 
 The routine calculates a set of weights that are closest in some sense to an
 initial set of weights such that, when summed, the weighted data hits the
@@ -44,8 +32,7 @@ function doreweighting(
     tolf               :: Real = 0.000001 ) :: Dict{ Symbol, Any }
 
 ```
-See the [testcase](../test/reweighter_tests.jl) for a simple example, based on
-examples from the Creedy paper.
+See the for a simple example, based on examples from the Creedy paper.
 
 The form of 'closeness' used is determined by the `functiontype` parameter of
 enumerated type `DistanceFunctionType`. See the [Creedy and Deville and
@@ -62,7 +49,6 @@ Sarndal](#Bibliography) papers on these. Notes on these:
 Modules = [BudgetConstraints]
 [:constant, :type, :function]
 ```
-
 
 ## TODO
 
