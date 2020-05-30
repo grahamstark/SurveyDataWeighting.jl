@@ -4,10 +4,7 @@ CurrentModule = SurveyDataWeighting
 
 # SurveyDataWeighting: Generating Sample Weights for a dataset
 
-```@index
-```
-
-This generates weights for a sample dataset such that weighted sums of dataset columns match some set of targets. For example, you might want to weight a dataset so that it matches known amounts of benefit receipts or numbers of households in different regions of a country, or both.
+This package generates weights for a sample dataset such that weighted sums of dataset columns match some set of targets. For example, you might want to weight a dataset so that it matches known amounts of benefit receipts or numbers of households in different regions of a country, or both.
 
 A commercial product [Calmar](http://vesselinov.com/CalmarEngDoc.pdf) is available for this, and widely used, but there are many advantages in having a version that you can easily embed in a simulation program. It can be very useful for producing forecasts, for example; see the papers by Reed and Stark and Creedy below.
 
@@ -38,6 +35,9 @@ Sarndal](#Bibliography) papers on these. Notes on these:
 * I believe Calmar implements different measures; see also D’Souza.
 
 ## Functions and Data Structures
+
+```@index
+```
 
 ```@autodocs
 Modules = [SurveyDataWeighting]
