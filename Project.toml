@@ -1,7 +1,7 @@
 name = "SurveyDataWeighting"
 uuid = "0d23d9a6-c44e-4ca5-9c36-ffcb6594a9c5"
 authors = ["Graham Stark"]
-version = "0.10.0"
+version = "1.0.0"
 
 [compat]
 julia = "1.0"
