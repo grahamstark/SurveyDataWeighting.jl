@@ -110,7 +110,7 @@ function do_reweighting(
         for row in 1:nrows
             rv = data[row,:]
             u = (rv' * lamdas)[1]
-            println("u=$u lamdas=$lamdas")
+            # println("u=$u lamdas=$lamdas")
             d_g_m1 = 0.0
             g_m1 = 0.0
             if functiontype == chi_square
@@ -150,8 +150,8 @@ function do_reweighting(
            end
         end # obs loop
         gradient = a - z
-        println( "gradient $gradient")
-        println( "hessian $hessian")
+        # println( "gradient $gradient")
+        # println( "hessian $hessian")
         d = Dict(:gradient=>gradient,:hessian=>hessian )
         return d
     end # nested function
