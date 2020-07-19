@@ -170,7 +170,7 @@ function do_reweighting(
         elseif functiontype == constrained_chi_square
             if( u < ( rl - 1.0 ))
                g_m1 = rl
-            elsif( u > ( ru - 1.0 ))
+            elseif( u > ( ru - 1.0 ))
                g_m1 = ru
             else
                g_m1 = 1.0 + u
