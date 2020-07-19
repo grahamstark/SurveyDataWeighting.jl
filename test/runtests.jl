@@ -102,3 +102,5 @@ sp = size( target_populations, 1 )
       end
    end # meth loop
 end # tests
+
+include( "large_scale_test.jl")

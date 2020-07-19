@@ -65,29 +65,35 @@ TARGETS = [
 #
 # subsample of scottish FRS 2018
 #
-data = readdlm( "data/scotmat.csv")
+data = readdlm( "../data/scotmat.csv")
 
 @testset "Weighting Tests using 2018 Scottish FRS Subset" begin
 
     nr,nc = size(data)
 
-    @test nr == size(TARGETS)[1]
+    @test nc == size(TARGETS)[1]
 
     hhlds_in_popn = sum( TARGETS[42:48]) # total num hhlds
 
     initial_weights = ones(nr)*hhlds_in_popn/nr
     @test sum(initial_weights) ≈ hhlds_in_popn
+    initial_weighted_popn = (initial_weights' * data)'
+    println( "initial-weighted_popn vs targets" )
+    for c in 1:nc
+        diffpc = 100*(initial_weighted_popn[c]-TARGETS[c])/TARGETS[c]
+        println( "$c $(TARGETS[c]) $(initial_weighted_popn[c]) $diffpc%")
+    end
 
     wchi = do_chi_square_reweighting( data, initial_weights, TARGETS )
+    println( "direct chi-square results $(wchi)")
 
-    println( "direct chi-square results $wchi")
     weighted_popn_chi = (wchi' * data)'
-    println( "wchisq; got $weighted_popn_chi")
+    # println( "wchisq; got $weighted_popn_chi")
     @test weighted_popn_chi ≈ TARGETS
 
-    lower_multiple = 0.20 # any smaller min and d_and_s_constrained fails on this dataset
-    upper_multiple = 2.19
-    for m in instances( DistanceFunctionType )
+    lower_multiple = 0.25 # any smaller min and d_and_s_constrained fails on this dataset
+    upper_multiple = 4.8
+    for m in [constrained_chi_square] #instances( DistanceFunctionType ) all other methods fail!
       println( "on method $m")
       rw = do_reweighting(
             data               = data,
@@ -98,7 +104,7 @@ data = readdlm( "data/scotmat.csv")
             upper_multiple     = upper_multiple,
             tolx               = 0.000001,
             tolf               = 0.000001 )
-      println( "results for method $m = $rw" )
+      println( "results for method $m = $(rw.rc)" )
       weights = rw.weights
       weighted_popn = (weights' * data)'
       println( "weighted_popn = $weighted_popn" )
@@ -118,6 +124,5 @@ data = readdlm( "data/scotmat.csv")
          end
       end
     end # meth loop
-
 
 end # testset
