@@ -1,5 +1,8 @@
 module SurveyDataWeighting
 
+using Base: Tuple
+using Base.Threads
+
 export do_chi_square_reweighting, do_reweighting
 export DistanceFunctionType, chi_square, d_and_s_type_a, d_and_s_type_b, constrained_chi_square, d_and_s_constrained
 export ITERATIONS_EXCEEDED
@@ -103,6 +106,8 @@ function do_reweighting(
         return Dict( :iterations=>iterations, :error=>error )
     end
 
+    
+
     function compute_lamdas_and_hessian()  :: Dict{ Symbol, Any }
         gradient = zeros( Float64, ncols, 1 )
         hessian = zeros( Float64, ncols, ncols )
@@ -156,8 +161,100 @@ function do_reweighting(
         return d
     end # nested function
 
+
+    function make_start_stops( nrows::Int, num_threads::Int )::Tuple
+        start = zeros(Int, num_threads)
+        stop = zeros(Int, num_threads)
+        chunk_size = Int(trunc(nrows/num_threads))-1;
+        p = 1;
+        for i in 1:num_threads
+            start[i] = p
+            p = p + chunk_size;
+            if i < num_threads;
+                stop[i] = p;
+            else;
+                stop[i] = nrows; # possibly different number on last thread
+            end;
+            p = p + 1;
+        end;
+        return (start, stop)
+    end
+
+    function compute_lamdas_and_hessian_threaded()  :: Dict{ Symbol, Any }
+        num_threads = nthreads()
+        start,stop = make_start_stops( nrows, num_threads )
+        t_hessian = Array{Matrix{Float64}}(undef, num_threads )
+        t_z = Array{Matrix{Float64}}(undef, num_threads ) # FIXME really a vector
+
+        @threads for thread in 1:num_threads
+            # println( "starting thread $thread with obs $(start[thread]) - $(stop[thread])")
+            gradient = zeros( Float64, ncols, 1 )
+            hessian = zeros( Float64, ncols, ncols )
+            z = zeros( Float64, ncols, 1 )
+            for row in start[thread]:stop[thread]
+                rv = data[row,:]
+                u = (rv' * lamdas)[1]
+                # println("u=$u lamdas=$lamdas")
+                d_g_m1 = 0.0
+                g_m1 = 0.0
+                if functiontype == chi_square
+                    d_g_m1 = 1.0;
+                    g_m1 = 1.0 + u;
+                elseif functiontype == constrained_chi_square
+                    if( u < ( rl - 1.0 ))
+                    g_m1 = rl
+                    d_g_m1 = 0.0
+                    elseif( u > ( ru - 1.0 ))
+                    g_m1 = ru
+                    d_g_m1 = 0.0
+                    else
+                    g_m1 = 1.0 + u
+                    d_g_m1 = 1.0
+                    end
+                elseif functiontype == d_and_s_type_a
+                    g_m1 = ( 1.0 -  u/2.0 ) ^ ( -2 )
+                    d_g_m1 = ( 1.0 - u/2.0 ) ^ ( -3 )
+                    elseif functiontype == d_and_s_type_b
+                    g_m1 = ( 1.0- u ) ^ (-1 )
+                    d_g_m1 = ( 1.0 - u ) ^ ( -2 )
+                    elseif functiontype == d_and_s_constrained
+                    alpha = ( ru - rl ) / (( 1.0 - rl )*( ru - 1.0 ))
+                    g_m1 = rl*(ru-1.0)+ru*(1.0-rl)*exp( alpha*u )/((ru-1.0)+(1.0-rl)*(exp( alpha*u )))
+                    d_g_m1 = g_m1 * ( ru - g_m1 ) *
+                        ((( 1.0 - rl )*alpha*exp( alpha*u )) /
+                        (( ru - 1.0 ) + (( 1.0 - rl ) * exp( alpha*u ))))
+                end # function cases
+                for col in 1:ncols
+                    z[col] += initial_weights[row]*data[row,col]*(g_m1-1.0)
+                    ## the hessian
+                    for c2 in 1:ncols
+                        zz :: Float64 = initial_weights[row]*data[row,col]*data[row,c2]
+                        hessian[col,c2] += zz*d_g_m1
+                    end
+                end # ncols
+            end # obs loop
+            t_z[thread] = z
+            t_hessian[thread] = hessian
+        end # threads
+
+        g_hessian = zeros( Float64, ncols, ncols )
+        g_z = zeros( Float64, ncols, 1 )
+        for i in 1:num_threads
+            g_hessian += t_hessian[i]
+            g_z += t_z[i]
+        end
+        gradient = a - g_z
+        # println( "gradient $gradient")
+        # println( "hessian $g_hessian")
+        # println( "z $g_z")
+        
+        d = Dict(:gradient=>gradient,:hessian=>g_hessian )
+        return d
+    end # nested function
+
+
     rc = local_solve_non_linear_equation_system(
-        compute_lamdas_and_hessian )
+        compute_lamdas_and_hessian_threaded )
 
     new_weights = copy(initial_weights)
     @assert rc[:error] == 0
