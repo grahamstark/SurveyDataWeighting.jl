@@ -5,14 +5,17 @@ using DelimitedFiles
 using LinearSolve # see: https://live.juliacon.org/talk/RUQAHC
 
 MAX=100
-TOL = 10^(-8)
 
 """
 Possible distance types; see Creedy.
 """
 @enum DistanceFunctionType chi_square constrained_chi_square d_and_s_constrained d_and_s_type_a d_and_s_type_b 
 
-function newton!( x::Vector, func::Function, data... )
+function newton!( 
+    x::Vector, 
+    func::Function, 
+    tol::AbstractFloat, 
+    data... )
     n = 0
     # println( "initial x = $x")
     for i in 1:MAX
@@ -25,7 +28,7 @@ function newton!( x::Vector, func::Function, data... )
         nh = norm( h )
         println( "norm(h) $nh")
         x += h
-        if nh < TOL
+        if nh < tol
             break
         end
     end
@@ -37,14 +40,14 @@ end
 #
 # Numerical recipes in Pascal ch9 p307-8
 #
-function newton_oldschool( x::Vector, func::Function, data... )
+function newton_oldschool( x::Vector, func::Function, tol, data... )
     n = 0
     # println( "initial x = $x")
     for i in 1:MAX
         n += 1
         f, hessian = func( x, data... )
         errf = sum(abs.(f))
-        if errf < TOL
+        if errf < tol
             break
         end
         h = hessian\f
@@ -86,8 +89,8 @@ function compute_f_and_hessian(
     functiontype :: DistanceFunctionType, 
     initial_weights :: Vector,
     target_populations :: Vector,
-    ru :: AbstractFloat,
-    rl :: AbstractFloat )
+    ru :: Number,
+    rl :: Number )
     nrows, ncols = size(data)
     @assert size(target_populations)[1] == ncols
     @assert size(λ)[1] == ncols
@@ -170,10 +173,9 @@ function do_reweighting(
     initial_weights    :: AbstractVector, # a column
     target_populations :: AbstractVector, # a row
     functiontype       :: DistanceFunctionType,
-    upper_multiple     :: Real = 0.0,
-    lower_multiple     :: Real = 0.0,
-    tolx               :: Real = 0.000001,
-    tolf               :: Real = 0.000001 )
+    upper_multiple     = 0.0,
+    lower_multiple     = 0.0,
+    tol                = 10^(-10) )
 
     nrows, ncols = size( data )
     @assert ncols == size( target_populations )[1]
@@ -185,6 +187,7 @@ function do_reweighting(
     # FIXME why doesn't this change λ in-place?
     λ = newton!( λ, 
         compute_f_and_hessian, 
+        tol, 
         data, 
         functiontype,
         initial_weights,
@@ -231,9 +234,7 @@ function do_reweighting(
     # println( "weighted_totals $weighted_totals")
     # println( "target_populations $target_populations")
     @assert weighted_totals ≈ target_populations
-
     return new_weights
-
 end
 
 
@@ -352,8 +353,7 @@ sp = size( target_populations, 1 )
             functiontype       = m,
             lower_multiple     = lower_multiple,
             upper_multiple     = upper_multiple,
-            tolx               = 0.000001,
-            tolf               = 0.000001 )
+            tol                = 0.000001 )
       println( "results for method $m = $weights" )
       # weights = rw.weights
       weighted_popn = (weights' * data)'
@@ -457,19 +457,22 @@ data = readdlm( "data/scotmat.csv")
     # println( "wchisq; got $weighted_popn_chi")
     @test weighted_popn_chi ≈ TARGETS
 
-    lower_multiple = 0.1 # any smaller min and d_and_s_constrained fails on this dataset
-    upper_multiple = 8.0
     for m in instances( DistanceFunctionType ) # all other methods fail!
       println( "on method $m")
+      if m == d_and_s_constrained
+        lower_multiple = 0.01# any smaller min and d_and_s_constrained fails on this dataset
+        upper_multiple = 8.00
+      else
+        lower_multiple = 0.25 # any smaller min and d_and_s_constrained fails on this dataset
+        upper_multiple = 4.80        
+      end
       weights = do_reweighting(
             data               = data,
             initial_weights    = initial_weights,
             target_populations = TARGETS,
             functiontype       = m,
             lower_multiple     = lower_multiple,
-            upper_multiple     = upper_multiple,
-            tolx               = 0.000001,
-            tolf               = 0.000001 )
+            upper_multiple     = upper_multiple )
       # println( "results for method $m = $(rw.rc)" )
       # weights = rw.weights
       weighted_popn = (weights' * data)'
