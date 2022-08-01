@@ -457,8 +457,8 @@ data = readdlm( "data/scotmat.csv")
     # println( "wchisq; got $weighted_popn_chi")
     @test weighted_popn_chi ≈ TARGETS
 
-    lower_multiple = 0.25 # any smaller min and d_and_s_constrained fails on this dataset
-    upper_multiple = 4.8
+    lower_multiple = 0.1 # any smaller min and d_and_s_constrained fails on this dataset
+    upper_multiple = 8.0
     for m in instances( DistanceFunctionType ) # all other methods fail!
       println( "on method $m")
       weights = do_reweighting(
