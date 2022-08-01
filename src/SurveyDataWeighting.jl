@@ -21,8 +21,6 @@ Possible distance types; see Creedy.
 
 const ITERATIONS_EXCEEDED = -1
 
-
-
 """"
 Make a weights vector which weights the matrix `data`
 so when summed the col totals sum to `target_populations`
@@ -202,28 +200,28 @@ function do_reweighting(
                     g_m1 = 1.0 + u;
                 elseif functiontype == constrained_chi_square
                     if( u < ( rl - 1.0 ))
-                    g_m1 = rl
-                    d_g_m1 = 0.0
+                        g_m1 = rl
+                        d_g_m1 = 0.0
                     elseif( u > ( ru - 1.0 ))
-                    g_m1 = ru
-                    d_g_m1 = 0.0
+                        g_m1 = ru
+                        d_g_m1 = 0.0
                     else
-                    g_m1 = 1.0 + u
-                    d_g_m1 = 1.0
+                        g_m1 = 1.0 + u
+                        d_g_m1 = 1.0
                     end
                 elseif functiontype == d_and_s_type_a
-                    g_m1 = ( 1.0 -  u/2.0 ) ^ ( -2 )
-                    d_g_m1 = ( 1.0 - u/2.0 ) ^ ( -3 )
+                        g_m1 = ( 1.0 -  u/2.0 ) ^ ( -2 )
+                        d_g_m1 = ( 1.0 - u/2.0 ) ^ ( -3 )
                     elseif functiontype == d_and_s_type_b
-                    g_m1 = ( 1.0- u ) ^ (-1 )
-                    d_g_m1 = ( 1.0 - u ) ^ ( -2 )
+                        g_m1 = ( 1.0- u ) ^ (-1 )
+                        d_g_m1 = ( 1.0 - u ) ^ ( -2 )
                     elseif functiontype == d_and_s_constrained
-                    alpha = ( ru - rl ) / (( 1.0 - rl )*( ru - 1.0 ))
-                    g_m1 = rl*(ru-1.0)+ru*(1.0-rl)*exp( alpha*u )/((ru-1.0)+(1.0-rl)*(exp( alpha*u )))
-                    d_g_m1 = g_m1 * ( ru - g_m1 ) *
-                        ((( 1.0 - rl )*alpha*exp( alpha*u )) /
-                        (( ru - 1.0 ) + (( 1.0 - rl ) * exp( alpha*u ))))
-                end # function cases
+                        alpha = ( ru - rl ) / (( 1.0 - rl )*( ru - 1.0 ))
+                        g_m1 = rl*(ru-1.0)+ru*(1.0-rl)*exp( alpha*u )/((ru-1.0)+(1.0-rl)*(exp( alpha*u )))
+                        d_g_m1 = g_m1 * ( ru - g_m1 ) *
+                            ((( 1.0 - rl )*alpha*exp( alpha*u )) /
+                            (( ru - 1.0 ) + (( 1.0 - rl ) * exp( alpha*u ))))
+                    end # function cases
                 for col in 1:ncols
                     z[col] += initial_weights[row]*data[row,col]*(g_m1-1.0)
                     ## the hessian
@@ -333,7 +331,5 @@ function do_chi_square_reweighting(
     end
     return weights;
 end
-
-# Write your package code here.
 
 end # package
