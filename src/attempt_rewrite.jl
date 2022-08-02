@@ -3,22 +3,25 @@ using Base.Threads
 using Test
 using DelimitedFiles
 using LinearSolve # see: https://live.juliacon.org/talk/RUQAHC
+using TableTraits
+using DataFrames
 
 MAX=100
 
 """
 Possible distance types; see Creedy.
 """
-@enum DistanceFunctionType chi_square constrained_chi_square d_and_s_constrained d_and_s_type_a d_and_s_type_b 
+@enum DistanceFunctionType chi_square constrained_chi_square d_and_s_constrained d_and_s_type_b d_and_s_type_a 
 
 function newton!( 
-    x::Vector, 
-    func::Function, 
-    tol::AbstractFloat, 
+    x :: Vector, 
+    func :: Function, 
+    tol :: AbstractFloat, 
+    max_iterations :: Integer,
     data... )
     n = 0
     # println( "initial x = $x")
-    for i in 1:MAX
+    for i in 1:max_iterations+1
         n += 1
         f, hessian = func( x, data... )
         # h = hessian\f
@@ -26,20 +29,21 @@ function newton!(
         prob = LinearProblem( hessian, f )
         h = solve( prob )
         nh = norm( h )
-        println( "norm(h) $nh")
+        # println( "norm(h) $nh")
         x += h
         if nh < tol
             break
         end
     end
     # println( "returning x as $x")
-    @assert n < MAX
+    @assert n <= max_iterations
     return x
 end
 
 #
 # Numerical recipes in Pascal ch9 p307-8
 #
+#=
 function newton_oldschool( x::Vector, func::Function, tol, data... )
     n = 0
     # println( "initial x = $x")
@@ -63,6 +67,7 @@ function newton_oldschool( x::Vector, func::Function, tol, data... )
     @assert n < MAX
     return x
 end
+=#
 
 function make_start_stops( nrows::Int, num_threads::Int )::Tuple
     start = zeros(Int, num_threads)
@@ -98,15 +103,13 @@ function compute_f_and_hessian(
     @assert ru >= rl 
     @assert rl >= 0
     num_threads = nthreads()
-    println( "num_threads $num_threads")
+    # println( "num_threads $num_threads")
     start,stop = make_start_stops( nrows, num_threads )
-    
     t_hessian = Array{Matrix{Float64}}(undef, num_threads )
     t_z = Array{Vector{Float64}}(undef, num_threads ) # FIXME really a vector
 
     a = target_populations - (initial_weights'*data)'
     @threads for thread in 1:num_threads
-        gradient = zeros( ncols )
         hessian = zeros( ncols, ncols )
         z = zeros( ncols )
         for row in start[thread]:stop[thread]
@@ -120,14 +123,14 @@ function compute_f_and_hessian(
                 g_m1 = 1.0 + u;
             elseif functiontype == constrained_chi_square
                 if( u < ( rl - 1.0 ))
-                g_m1 = rl
-                d_g_m1 = 0.0
+                    g_m1 = rl
+                    d_g_m1 = 0.0
                 elseif( u > ( ru - 1.0 ))
-                g_m1 = ru
-                d_g_m1 = 0.0
+                    g_m1 = ru
+                    d_g_m1 = 0.0
                 else
-                g_m1 = 1.0 + u
-                d_g_m1 = 1.0
+                    g_m1 = 1.0 + u
+                    d_g_m1 = 1.0
                 end
             elseif functiontype == d_and_s_type_a
                 g_m1 = ( 1.0 -  u/2.0 ) ^ ( -2 )
@@ -166,17 +169,47 @@ function compute_f_and_hessian(
     return f,g_hessian
 end 
 
+""""
+Make a weights vector which weights the matrix `data`
+so when summed the col totals sum to `target_populations`
+See the Creedy Paper for `function_type`
+If using one of the constrained types,
+the output weights should be no more than ru*the initial weight,
+no less than rl
+Returns a Dict with :=>weights and some extra info on convergence.
+data : KxJ matrix where k is num observations and J is num constraints;
+see:
+Microdata Adjustment by the Minimum Information Loss Principle Joachim Merz; FFB Discussion Paper No. 10 July 1994
+for a good discussion on how to lay out the dataset
 
+intial_weights, new_weights : K length vector
+target_populations - J length vector;
+
+upper_multiple/lower_multiple max/min acceptable values of ratio of final_weight/initial_weight (for constrained distance functions)
+tol, 
+max_iterations : for controlling convergence
+
+note: chi-square is just there for checking purposes; use `do_chi_square_reweighting` if that's all you need.
+
+upper_multiple/lower_multiple max/min acceptable values of ratio of final_weight/initial_weight (for constrained distance functions)
+
+"""
 function do_reweighting(
     ;
-    data               :: AbstractMatrix,
+    data,              # either AbstractMatrix or e.g dataframe
     initial_weights    :: AbstractVector, # a column
     target_populations :: AbstractVector, # a row
     functiontype       :: DistanceFunctionType,
     upper_multiple     = 0.0,
     lower_multiple     = 0.0,
-    tol                = 10^(-10) )
+    tol                = 10^(-10),
+    max_iterations     = 100 )
 
+    @assert isiterabletable(data)||isa(data,AbstractArray)
+    if isiterabletable(data) # if not a matrix, convert to matrix via a dataframe; this should always work regardless of what data actually is. 
+        # see: e.g http://www.david-anthoff.com/jl4ds/stable/tabletraits/
+        data = data |> DataFrame |> Matrix # note FIXME copy not view
+    end
     nrows, ncols = size( data )
     @assert ncols == size( target_populations )[1]
     @assert nrows == size( initial_weights )[1]
@@ -188,6 +221,7 @@ function do_reweighting(
     λ = newton!( λ, 
         compute_f_and_hessian, 
         tol, 
+        max_iterations,
         data, 
         functiontype,
         initial_weights,
@@ -197,8 +231,8 @@ function do_reweighting(
     # println( "final λs=$λ")
     new_weights = copy(initial_weights)
     for r in 1:nrows
-        row = data[r,:]
-        u = (row'*λ)[1]
+        row = view(data,r,:)
+        u = row'*λ
         g_m1 = 0.0
         if functiontype == chi_square
             g_m1 = 1.0 + u;
@@ -215,8 +249,8 @@ function do_reweighting(
         elseif functiontype == d_and_s_type_b
            g_m1 = ( 1.0- u ) ^ (-1 )
         elseif functiontype == d_and_s_constrained
-           alpha = ( ru - rl ) / (( 1.0 - rl )*( ru - 1.0 ))
-           g_m1 = rl*(ru-1.0)+ru*(1.0-rl)*exp( alpha*u )/((ru-1.0)+(1.0-rl)*(exp( alpha*u )))
+           α = ( ru - rl ) / (( 1.0 - rl )*( ru - 1.0 ))
+           g_m1 = rl*(ru-1.0)+ru*(1.0-rl)*exp( α*u )/((ru-1.0)+(1.0-rl)*(exp( α*u )))
        end # function cases
         #
         # Creedy wp 03/17 table 3
@@ -346,7 +380,7 @@ sp = size( target_populations, 1 )
    upper_multiple = 2.19
    for m in instances( DistanceFunctionType )
       # println( "on method $m")
-      weights = do_reweighting(
+      @time weights = do_reweighting(
             data               = data,
             initial_weights    = initial_weights,
             target_populations = target_populations,
@@ -354,7 +388,7 @@ sp = size( target_populations, 1 )
             lower_multiple     = lower_multiple,
             upper_multiple     = upper_multiple,
             tol                = 0.000001 )
-      println( "results for method $m = $weights" )
+      println( "results for method $m = $(weights[1:20])" )
       # weights = rw.weights
       weighted_popn = (weights' * data)'
       println( "weighted_popn = $weighted_popn" )
@@ -451,7 +485,7 @@ data = readdlm( "data/scotmat.csv")
     end
 
     wchi = do_chi_square_reweighting( data, initial_weights, TARGETS )
-    println( "direct chi-square results $(wchi)")
+    println( "direct chi-square results $(wchi[1:10])")
 
     weighted_popn_chi = (wchi' * data)'
     # println( "wchisq; got $weighted_popn_chi")
@@ -473,8 +507,7 @@ data = readdlm( "data/scotmat.csv")
             functiontype       = m,
             lower_multiple     = lower_multiple,
             upper_multiple     = upper_multiple )
-      # println( "results for method $m = $(rw.rc)" )
-      # weights = rw.weights
+      println( "results for method $m = $(weights[1:10])" )
       weighted_popn = (weights' * data)'
       println( "weighted_popn = $weighted_popn" )
       @test weighted_popn ≈ TARGETS
