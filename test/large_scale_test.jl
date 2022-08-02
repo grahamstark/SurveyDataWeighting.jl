@@ -2,13 +2,6 @@ using SurveyDataWeighting
 using Test
 using DelimitedFiles
 
-#
-# This is a simple test using real data, trying
-# to match up a sample of FRS data from 2018 to some Scottish Targets
-#
-# This is some target data from Scotland 2020
-# There is discussion of these targets in thhe ScottishTaxBenefit Model docs.
-#
 TARGETS = [
     1_340_609.0, # 1 - M- Total in employment- aged 16+ - empl, unempl by sex
     60_635, # 2 - M- Total unemployed- aged 16+
@@ -62,10 +55,8 @@ TARGETS = [
     127_307, # 50 - AA - in receipt
     431_461 ] # 51 PIP or DLA
 
-#
-# subsample of scottish FRS 2018
-#
 data = readdlm( "../data/scotmat.csv")
+datadf = DataFrame( data, :auto )
 
 @testset "Weighting Tests using 2018 Scottish FRS Subset" begin
 
@@ -85,27 +76,29 @@ data = readdlm( "../data/scotmat.csv")
     end
 
     wchi = do_chi_square_reweighting( data, initial_weights, TARGETS )
-    println( "direct chi-square results $(wchi)")
+    println( "direct chi-square results $(wchi[1:10])")
 
     weighted_popn_chi = (wchi' * data)'
     # println( "wchisq; got $weighted_popn_chi")
     @test weighted_popn_chi ≈ TARGETS
 
-    lower_multiple = 0.25 # any smaller min and d_and_s_constrained fails on this dataset
-    upper_multiple = 4.8
-    for m in [constrained_chi_square] #instances( DistanceFunctionType ) all other methods fail!
+    for m in [chi_square, constrained_chi_square, d_and_s_constrained] # instances( DistanceFunctionType ) # all other methods fail!
       println( "on method $m")
-      rw = do_reweighting(
+      if m == d_and_s_constrained
+        lower_multiple = 0.01# any smaller min and d_and_s_constrained fails on this dataset
+        upper_multiple = 8.00
+      else
+        lower_multiple = 0.25 # any smaller min and d_and_s_constrained fails on this dataset
+        upper_multiple = 4.80        
+      end
+      weights = do_reweighting(
             data               = data,
             initial_weights    = initial_weights,
             target_populations = TARGETS,
             functiontype       = m,
             lower_multiple     = lower_multiple,
-            upper_multiple     = upper_multiple,
-            tolx               = 0.000001,
-            tolf               = 0.000001 )
-      println( "results for method $m = $(rw.rc)" )
-      weights = rw.weights
+            upper_multiple     = upper_multiple )
+      println( "results for method $m = $(weights[1:10])" )
       weighted_popn = (weights' * data)'
       println( "weighted_popn = $weighted_popn" )
       @test weighted_popn ≈ TARGETS

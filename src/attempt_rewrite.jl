@@ -6,19 +6,21 @@ using LinearSolve # see: https://live.juliacon.org/talk/RUQAHC
 using TableTraits
 using DataFrames
 
-MAX=100
-
 """
 Possible distance types; see Creedy.
 """
 @enum DistanceFunctionType chi_square constrained_chi_square d_and_s_constrained d_and_s_type_b d_and_s_type_a 
 
+"""
+a very simple Implementation of Newton's method.
+`func` here both evaluates the function and creates the hessian
+"""
 function newton!( 
     x :: Vector, 
     func :: Function, 
     tol :: AbstractFloat, 
     max_iterations :: Integer,
-    data... )
+    data... ) :: Vector
     n = 0
     # println( "initial x = $x")
     for i in 1:max_iterations+1
@@ -87,7 +89,9 @@ function make_start_stops( nrows::Int, num_threads::Int )::Tuple
     return (start, stop)
 end
 
-
+"""
+internal use only - the function called by `newton`.
+"""
 function compute_f_and_hessian( 
     λ    :: AbstractVector, 
     data :: Matrix, 
@@ -182,12 +186,14 @@ see:
 Microdata Adjustment by the Minimum Information Loss Principle Joachim Merz; FFB Discussion Paper No. 10 July 1994
 for a good discussion on how to lay out the dataset
 
-intial_weights, new_weights : K length vector
-target_populations - J length vector;
+`data` : 
+`intial_weights` : K length vector
+`target_populations` - J length vector;
 
-upper_multiple/lower_multiple max/min acceptable values of ratio of final_weight/initial_weight (for constrained distance functions)
-tol, 
-max_iterations : for controlling convergence
+`upper_multiple`
+`lower_multiple` max/min acceptable values of ratio of final_weight/initial_weight (for constrained distance functions)
+`tol` for the root finder 
+`max_iterations` : for controlling convergence
 
 note: chi-square is just there for checking purposes; use `do_chi_square_reweighting` if that's all you need.
 
