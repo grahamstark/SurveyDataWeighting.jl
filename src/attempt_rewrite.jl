@@ -260,8 +260,8 @@ function do_reweighting(
     if functiontype in [constrained_chi_square, d_and_s_constrained ]
      # check the constrainted methods keep things inside ll and ul
         for r in 1:nrows
-            @assert new_weights[r] <= initial_weights[r]*upper_multiple
-            @assert new_weights[r] >= initial_weights[r]*lower_multiple
+            @assert new_weights[r] <= initial_weights[r]*ru
+            @assert new_weights[r] >= initial_weights[r]*rl
         end
     end #
     weighted_totals = (new_weights' * data)'
@@ -280,9 +280,15 @@ Note the weights can be negative.
 See the Creedy Papers.
 "
 function do_chi_square_reweighting(
-    data               :: AbstractMatrix,
+    data,
     initial_weights    :: AbstractVector, # a row
     target_populations :: AbstractVector ) :: Vector
+    @assert isiterabletable(data)||isa(data,AbstractArray)
+    # not needed?
+    if isiterabletable(data) # if not a matrix, convert to matrix via a dataframe; this should always work regardless of what data actually is. 
+        # see: e.g http://www.david-anthoff.com/jl4ds/stable/tabletraits/
+        data = data |> DataFrame |> Matrix # note FIXME copy not view
+    end
 
     nrows = size( data )[1]
     ncols = size( data )[2]
@@ -293,7 +299,7 @@ function do_chi_square_reweighting(
     weights = zeros( nrows )
     m = zeros( ncols, ncols )
     for r in 1:nrows
-        row = data[r,:]
+        row = view(data,r,:)
         m += initial_weights[r]*(row*row')
         for c in 1:ncols
             populations[c] += (row[c]*initial_weights[r])'
@@ -466,6 +472,7 @@ TARGETS = [
     431_461 ] # 51 PIP or DLA
 
 data = readdlm( "data/scotmat.csv")
+datadf = DataFrame( data, :auto )
 
 @testset "Weighting Tests using 2018 Scottish FRS Subset" begin
 
