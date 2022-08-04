@@ -12,18 +12,20 @@ The routine calculates a set of weights that are closest in some sense to an ini
 
 ```julia
 
-function doreweighting(
-    data               :: AbstractArray{ <:Real, 2 },
-    initial_weights    :: AbstractArray{ <:Real, 1 }, # a column
-    target_populations :: AbstractArray{ <:Real, 1 }, # a row
+function do_reweighting(
+    ;
+    data,              # either AbstractMatrix or e.g dataframe
+    initial_weights    :: AbstractVector, # a column
+    target_populations :: AbstractVector, # a row
     functiontype       :: DistanceFunctionType,
-    ru                 :: Real = 0.0,
-    rl                 :: Real = 0.0,
-    tolx               :: Real = 0.000001,
-    tolf               :: Real = 0.000001 ) :: NamedTuple
+    upper_multiple     = 0.0,
+    lower_multiple     = 0.0,
+    tol                = 10^(-10),
+    max_iterations     = 100 )
 
 ```
-See the for a simple example, based on examples from the Creedy paper.
+
+See the tests for simple examples, based on examples from the Creedy paper.
 
 The form of 'closeness' used is determined by the `functiontype` parameter of
 enumerated type `DistanceFunctionType`. See the [Creedy and Deville and
@@ -33,6 +35,8 @@ Sarndal](#Bibliography) papers on these. Notes on these:
 * `constrained_chi_square` usually works best - this produces squared-difference weights that are at most `ru` times the original weight and at least `rl` times the original.
 * the other measures are taken from the Deville and Sarndal paper and pass simple tests but sometimes fail to converge in real-world situations; whether this is because of something inherent or some mistake I've made I'm unsure;
 * I believe Calmar implements different measures; see also D’Souza.
+
+see: Merz (1994) for a good discussion on how to lay out the dataset.
 
 ## Functions and Data Structures
 
@@ -46,12 +50,7 @@ Modules = [SurveyDataWeighting]
 
 ## TODO
 
-* I really need to use standard Julia optimiser packages, such as [Optim.jl](https://github.com/JuliaNLSolvers/Optim.jl);
 * Chase up and add different closeness measures, e.g the Entropy measure I remember from an old Atkinson and Gomulka working paper, and whatever I can find elsewhere;
-* the weird bug with the non-nested callback..
-* am I using abstract arrays correctly?
-* test with a huge dataset;
-* how can I integrate this with a DataFrame?
 
 ## Bibliography
 
