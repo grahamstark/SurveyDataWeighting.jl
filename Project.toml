@@ -1,7 +1,7 @@
 name = "SurveyDataWeighting"
 uuid = "0d23d9a6-c44e-4ca5-9c36-ffcb6594a9c5"
 authors = ["Graham Stark"]
-version = "1.0.5"
+version = "1.0.6"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -12,7 +12,7 @@ TableTraits = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
 
 [compat]
 DataFrames = "1.7,1.8,1.9"
-LinearSolve = "2"
+LinearSolve = "2,3"
 TableTraits = "1"
 julia = "1"
 
