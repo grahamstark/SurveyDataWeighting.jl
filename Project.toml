@@ -12,7 +12,7 @@ TableTraits = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
 
 [compat]
 DataFrames = "1,2"
-LinearSolve = "2,3"
+LinearSolve = "1,2,3,4,5"
 TableTraits = "1"
 julia = "1"
 
