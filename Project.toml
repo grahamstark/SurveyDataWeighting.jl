@@ -14,7 +14,7 @@ TableTraits = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
 DataFrames = "1,2"
 LinearSolve = "1,2,3,4,5"
 TableTraits = "1"
-julia = "1"
+julia = "1.10"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
