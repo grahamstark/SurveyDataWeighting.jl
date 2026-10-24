@@ -95,7 +95,7 @@ sp = size( target_populations, 1 )
         # weights = rw.weights
         weighted_popn = (weights' * data)'
         println( "weighted_popn = $weighted_popn" )
-        @test weighted_popn ≈ target_populations
+        @test isapprox(weighted_popn, target_populations, rtol=0.00001)
         if m != chi_square
             for w in weights # check: what's the 1-liner for this?
                 @test w > 0.0

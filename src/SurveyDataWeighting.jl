@@ -304,7 +304,7 @@ function do_reweighting(
     weighted_totals = (new_weights' * data)'
     # println( "weighted_totals $weighted_totals")
     # println( "target_populations $target_populations")
-    @assert weighted_totals ≈ target_populations
+    @assert isapprox(weighted_totals,target_populations,rtol=0.0001)
     return new_weights
 end
 
