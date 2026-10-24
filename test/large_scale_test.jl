@@ -82,15 +82,10 @@ datadf = DataFrame( data, :auto )
     # println( "wchisq; got $weighted_popn_chi")
     @test weighted_popn_chi ≈ TARGETS
 
-    for m in [chi_square, constrained_chi_square, d_and_s_constrained] # instances( DistanceFunctionType ) # all other methods fail!
+    lower_multiple = 0.25
+    upper_multiple = 4.80
+    for m in instances( DistanceFunctionType )
       println( "on method $m")
-      if m == d_and_s_constrained
-        lower_multiple = 0.01# any smaller min and d_and_s_constrained fails on this dataset
-        upper_multiple = 8.00
-      else
-        lower_multiple = 0.25 # any smaller min and d_and_s_constrained fails on this dataset
-        upper_multiple = 4.80        
-      end
       weights = do_reweighting(
             data               = data,
             initial_weights    = initial_weights,
@@ -103,18 +98,14 @@ datadf = DataFrame( data, :auto )
       println( "weighted_popn = $weighted_popn" )
       @test weighted_popn ≈ TARGETS
       if m != chi_square
-         for w in weights # check: what's the 1-liner for this?
-            @test w > 0.0
-         end
+         @test all( weights .> 0.0 )
       else
          @test weights ≈ wchi # chisq the direct way should match chisq the iterative way
       end
       if m in [constrained_chi_square, d_and_s_constrained ]
          # check the constrainted methods keep things inside ll and ul
-         for r in 1:nrows
-            @test weights[r] <= initial_weights[r]*upper_multiple
-            @test weights[r] >= initial_weights[r]*lower_multiple
-         end
+         @test all( weights .<= initial_weights .* upper_multiple )
+         @test all( weights .>= initial_weights .* lower_multiple )
       end
     end # meth loop
 

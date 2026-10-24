@@ -25,8 +25,13 @@ Possible distance types; see Creedy.
 
 
 """
-a very simple Implementation of Newton's method.
-`func` here both evaluates the function and creates the hessian
+Damped Newton's method.
+`func( x, data... )` returns `(f, hessian, ok)`, where `f` is the residual we're driving to zero
+and `ok` is false if `x` is outside the domain of the distance function (or gives non-finite values).
+Each full Newton step is halved until it lands inside the domain and reduces `norm(f)`;
+without this the first step (which is always the chi-square solution) can jump past the poles of
+the Deville-Sarndal functions on real datasets and the iterations never recover.
+Stops when `norm(f) <= tol`.
 """
 function newton!( 
     x :: Vector, 
@@ -34,24 +39,30 @@ function newton!(
     tol :: AbstractFloat, 
     max_iterations :: Integer,
     data... ) :: Vector
+    f, hessian, ok = func( x, data... )
+    @assert ok "initial point is outside the domain of the distance function"
     n = 0
-    # println( "initial x = $x")
-    for i in 1:max_iterations+1
+    while norm( f ) > tol
         n += 1
-        f, hessian = func( x, data... )
-        # h = hessian\f
+        @assert n <= max_iterations "no convergence after $max_iterations iterations; norm(f)=$(norm(f)), tol=$tol"
         # see: https://live.juliacon.org/talk/RUQAHC
         prob = LinearProblem( hessian, f )
-        h = solve( prob )
-        nh = norm( h )
-        # println( "norm(h) $nh")
-        x += h
-        if nh < tol
-            break
+        h = solve( prob ).u
+        nf = norm( f )
+        step = 1.0
+        while true
+            trial = x + step*h
+            f_t, hessian_t, ok = func( trial, data... )
+            if ok && norm( f_t ) <= (1.0-1e-4*step)*nf
+                x .= trial
+                f = f_t
+                hessian = hessian_t
+                break
+            end
+            step /= 2
+            @assert step > 1e-12 "line search failed; targets may be infeasible for this distance function and these limits. norm(f)=$nf"
         end
     end
-    # println( "returning x as $x")
-    @assert n <= max_iterations
     return x
 end
 
@@ -103,6 +114,55 @@ function make_start_stops( nrows::Int, num_threads::Int )::Tuple
 end
 
 """
+internal use only. For distance function `functiontype`, returns `(g, dg, ok)`:
+`g` is the ratio final/initial weight for `u = x'λ` (`F(u)` in Deville and Sarndal),
+`dg` its derivative wrt `u`, and `ok` false if `u` is outside the domain of `F`.
+"""
+function g_and_derivative(
+    functiontype :: DistanceFunctionType,
+    u  :: Number,
+    ru :: Number,
+    rl :: Number ) :: Tuple
+    g = 0.0
+    dg = 0.0
+    ok = true
+    if functiontype == chi_square
+        g = 1.0 + u
+        dg = 1.0
+    elseif functiontype == constrained_chi_square
+        if( u < ( rl - 1.0 ))
+            g = rl
+        elseif( u > ( ru - 1.0 ))
+            g = ru
+        else
+            g = 1.0 + u
+            dg = 1.0
+        end
+    elseif functiontype == d_and_s_type_a
+        ok = u < 2.0 # pole at u=2; F isn't monotone beyond it
+        g = ( 1.0 - u/2.0 ) ^ ( -2 )
+        dg = ( 1.0 - u/2.0 ) ^ ( -3 )
+    elseif functiontype == d_and_s_type_b
+        ok = u < 1.0 # pole at u=1; weights negative beyond it
+        g = ( 1.0 - u ) ^ ( -1 )
+        dg = ( 1.0 - u ) ^ ( -2 )
+    elseif functiontype == d_and_s_constrained
+        α = ( ru - rl ) / (( 1.0 - rl )*( ru - 1.0 ))
+        au = α*u
+        if au > 0 # divide through by exp(αu) so it never overflows
+            e = exp( -au )
+            g = ( rl*( ru - 1.0 )*e + ru*( 1.0 - rl )) / (( ru - 1.0 )*e + ( 1.0 - rl ))
+        else
+            e = exp( au )
+            g = ( rl*( ru - 1.0 ) + ru*( 1.0 - rl )*e ) / (( ru - 1.0 ) + ( 1.0 - rl )*e )
+        end
+        g = clamp( g, rl, ru ) # rounding can push g a hair past the limits
+        dg = α*( g - rl )*( ru - g )/( ru - rl )
+    end # function cases
+    return g, dg, ok && isfinite( g ) && isfinite( dg )
+end
+
+"""
 internal use only - the function called by `newton`.
 """
 function compute_f_and_hessian( 
@@ -124,6 +184,7 @@ function compute_f_and_hessian(
     start,stop = make_start_stops( nrows, num_threads )
     t_hessian = Array{Matrix{Float64}}(undef, num_threads )
     t_z = Array{Vector{Float64}}(undef, num_threads ) # FIXME really a vector
+    ok = fill( true, num_threads )
 
     a = target_populations - (initial_weights'*data)'
     @threads for thread in 1:num_threads
@@ -132,36 +193,8 @@ function compute_f_and_hessian(
         for row in start[thread]:stop[thread]
             rv = view(data,row,:)
             u = (rv' * λ)
-            # println("u=$u λ=$λ")
-            d_g_m1 = 0.0
-            g_m1 = 0.0
-            if functiontype == chi_square
-                d_g_m1 = 1.0;
-                g_m1 = 1.0 + u;
-            elseif functiontype == constrained_chi_square
-                if( u < ( rl - 1.0 ))
-                    g_m1 = rl
-                    d_g_m1 = 0.0
-                elseif( u > ( ru - 1.0 ))
-                    g_m1 = ru
-                    d_g_m1 = 0.0
-                else
-                    g_m1 = 1.0 + u
-                    d_g_m1 = 1.0
-                end
-            elseif functiontype == d_and_s_type_a
-                g_m1 = ( 1.0 -  u/2.0 ) ^ ( -2 )
-                d_g_m1 = ( 1.0 - u/2.0 ) ^ ( -3 )
-            elseif functiontype == d_and_s_type_b
-                g_m1 = ( 1.0- u ) ^ (-1 )
-                d_g_m1 = ( 1.0 - u ) ^ ( -2 )
-            elseif functiontype == d_and_s_constrained
-                α = ( ru - rl ) / (( 1.0 - rl )*( ru - 1.0 ))
-                g_m1 = rl*(ru-1.0)+ru*(1.0-rl)*exp( α*u )/((ru-1.0)+(1.0-rl)*(exp( α*u )))
-                d_g_m1 = g_m1 * ( ru - g_m1 ) *
-                    ((( 1.0 - rl )*α*exp( α*u )) /
-                    (( ru - 1.0 ) + (( 1.0 - rl ) * exp( α*u ))))
-            end # function cases
+            g_m1, d_g_m1, row_ok = g_and_derivative( functiontype, u, ru, rl )
+            ok[thread] &= row_ok
             for col in 1:ncols
                 z[col] += initial_weights[row]*data[row,col]*(g_m1-1.0)
                 ## the hessian
@@ -183,7 +216,7 @@ function compute_f_and_hessian(
     f = a - g_z
     # println( "gradient $f")
     # println( "hessian $g_hessian")
-    return f,g_hessian
+    return f, g_hessian, all( ok )
 end 
 
 """"
@@ -205,7 +238,7 @@ for a good discussion on how to lay out the dataset
 
 `upper_multiple`
 `lower_multiple` max/min acceptable values of ratio of final_weight/initial_weight (for constrained distance functions)
-`tol` for the root finder 
+`tol` for the root finder, relative to `norm(target_populations)`
 `max_iterations` : for controlling convergence
 
 note: chi-square is just there for checking purposes; use `do_chi_square_reweighting` if that's all you need.
@@ -236,10 +269,13 @@ function do_reweighting(
     λ = zeros( ncols )
     ru = upper_multiple # shorthand
     rl = lower_multiple
-    # FIXME why doesn't this change λ in-place?
+    if functiontype in [constrained_chi_square, d_and_s_constrained ]
+        @assert rl < 1.0 < ru "need lower_multiple < 1 < upper_multiple; got $rl, $ru"
+    end
+    # tol is relative to the size of the targets
     λ = newton!( λ, 
         compute_f_and_hessian, 
-        tol, 
+        tol*max( 1.0, norm( target_populations )), 
         max_iterations,
         data, 
         functiontype,
@@ -252,25 +288,7 @@ function do_reweighting(
     for r in 1:nrows
         row = view(data,r,:)
         u = row'*λ
-        g_m1 = 0.0
-        if functiontype == chi_square
-            g_m1 = 1.0 + u;
-        elseif functiontype == constrained_chi_square
-            if( u < ( rl - 1.0 ))
-               g_m1 = rl
-            elseif( u > ( ru - 1.0 ))
-               g_m1 = ru
-            else
-               g_m1 = 1.0 + u
-            end
-        elseif functiontype == d_and_s_type_a
-           g_m1 = ( 1.0 -  u/2.0 ) ^ ( -2 )
-        elseif functiontype == d_and_s_type_b
-           g_m1 = ( 1.0- u ) ^ (-1 )
-        elseif functiontype == d_and_s_constrained
-           α = ( ru - rl ) / (( 1.0 - rl )*( ru - 1.0 ))
-           g_m1 = rl*(ru-1.0)+ru*(1.0-rl)*exp( α*u )/((ru-1.0)+(1.0-rl)*(exp( α*u )))
-       end # function cases
+        g_m1, _, _ = g_and_derivative( functiontype, u, ru, rl )
         #
         # Creedy wp 03/17 table 3
         #
@@ -286,7 +304,7 @@ function do_reweighting(
     weighted_totals = (new_weights' * data)'
     # println( "weighted_totals $weighted_totals")
     # println( "target_populations $target_populations")
-    @assert weighted_totals ≈ target_populations
+    @assert isapprox(weighted_totals,target_populations,rtol=0.0001)
     return new_weights
 end
 
